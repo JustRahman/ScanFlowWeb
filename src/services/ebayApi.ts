@@ -92,11 +92,42 @@ let tokenExpiresAt: number = 0;
 
 // Rate limit configuration
 const RATE_LIMIT_CONFIG = {
-  maxRetries: 3,
+  maxRetries: 2, // eBay requires max 2 retries for 5xx errors
   initialDelayMs: 1000,
   maxDelayMs: 30000,
   backoffMultiplier: 2,
 };
+
+// 24-hour item cache to prevent re-scanning same items
+const itemCache = new Map<string, { data: unknown; timestamp: number }>();
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+function getCachedItem<T>(key: string): T | null {
+  const cached = itemCache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return cached.data as T;
+  }
+  if (cached) {
+    itemCache.delete(key); // Clean up expired entry
+  }
+  return null;
+}
+
+function setCachedItem(key: string, data: unknown): void {
+  itemCache.set(key, { data, timestamp: Date.now() });
+}
+
+// Clean up expired cache entries periodically
+function cleanupCache(): void {
+  const now = Date.now();
+  const keysToDelete: string[] = [];
+  itemCache.forEach((value, key) => {
+    if (now - value.timestamp >= CACHE_TTL_MS) {
+      keysToDelete.push(key);
+    }
+  });
+  keysToDelete.forEach(key => itemCache.delete(key));
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -249,9 +280,16 @@ export async function searchEbayListings(params: EbaySearchParams): Promise<Ebay
 }
 
 /**
- * Get item details by item ID
+ * Get item details by item ID (with 24-hour cache)
  */
 export async function getEbayItem(itemId: string): Promise<EbayItemSummary | null> {
+  // Check cache first
+  const cacheKey = `item:${itemId}`;
+  const cached = getCachedItem<EbayItemSummary>(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
   const accessToken = await getAccessToken();
   const url = `${EBAY_BROWSE_URL}/item/${itemId}`;
 
@@ -273,7 +311,12 @@ export async function getEbayItem(itemId: string): Promise<EbayItemSummary | nul
     throw new Error(`eBay get item failed: ${response.status}`);
   }
 
-  return response.json();
+  const item = await response.json();
+
+  // Cache the result
+  setCachedItem(cacheKey, item);
+
+  return item;
 }
 
 // Book wholesale sellers
