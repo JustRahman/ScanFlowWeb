@@ -137,8 +137,25 @@ export async function GET() {
     });
   } catch (error) {
     console.error('Featured books error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch featured books';
+
+    // Determine user-friendly error message
+    let userMessage = 'Unable to load featured deals';
+    let errorCode = 'UNKNOWN_ERROR';
+
+    if (errorMessage.includes('429') || errorMessage.includes('Rate limit')) {
+      userMessage = 'eBay API rate limit reached. Please try again later.';
+      errorCode = 'RATE_LIMIT';
+    } else if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+      userMessage = 'eBay API authentication failed.';
+      errorCode = 'AUTH_ERROR';
+    } else if (errorMessage.includes('credentials not configured')) {
+      userMessage = 'API credentials not configured.';
+      errorCode = 'CONFIG_ERROR';
+    }
+
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to fetch featured books', deals: [] },
+      { error: userMessage, errorCode, deals: [] },
       { status: 500 }
     );
   }

@@ -59,6 +59,7 @@ export default function Home() {
   // Featured books (loaded on mount)
   const [featuredDeals, setFeaturedDeals] = useState<Deal[]>([]);
   const [featuredLoading, setFeaturedLoading] = useState(true);
+  const [featuredError, setFeaturedError] = useState<string | null>(null);
 
   // Filters
   const [showFilters, setShowFilters] = useState(false);
@@ -71,12 +72,16 @@ export default function Home() {
     async function loadFeatured() {
       try {
         const response = await fetch('/api/featured');
+        const data = await response.json();
         if (response.ok) {
-          const data = await response.json();
           setFeaturedDeals(data.deals || []);
+          setFeaturedError(null);
+        } else {
+          setFeaturedError(data.error || 'Failed to load featured deals');
         }
       } catch (err) {
         console.error('Failed to load featured books:', err);
+        setFeaturedError('Network error. Please check your connection.');
       } finally {
         setFeaturedLoading(false);
       }
@@ -411,6 +416,14 @@ export default function Home() {
               <div className="flex items-center justify-center py-16">
                 <Loader2 className="w-8 h-8 text-neutral-400 animate-spin" />
                 <span className="ml-3 text-neutral-500">Finding best deals...</span>
+              </div>
+            ) : featuredError ? (
+              <div className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg mb-12">
+                <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" strokeWidth={1.5} />
+                <div>
+                  <p className="text-amber-700 dark:text-amber-300 font-medium">{featuredError}</p>
+                  <p className="text-amber-600 dark:text-amber-400 text-sm mt-1">You can still search for books manually above.</p>
+                </div>
               </div>
             ) : featuredDeals.length > 0 ? (
               <div className="grid gap-4 mb-12">
