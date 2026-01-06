@@ -86,9 +86,10 @@ export interface EbaySearchResponse {
   itemSummaries?: EbayItemSummary[];
 }
 
-// Token cache
+// Token cache with lock to prevent race conditions
 let cachedToken: OAuthToken | null = null;
 let tokenExpiresAt: number = 0;
+let tokenFetchPromise: Promise<string> | null = null; // Lock for concurrent requests
 
 // Rate limit configuration
 const RATE_LIMIT_CONFIG = {
@@ -201,42 +202,68 @@ async function fetchWithRetry(
 
 /**
  * Get OAuth access token using Client Credentials flow
+ * Uses a lock to prevent race conditions with concurrent requests
  */
 async function getAccessToken(): Promise<string> {
   if (!CLIENT_ID || !CLIENT_SECRET) {
     throw new Error('eBay API credentials not configured');
   }
 
+  // Return cached token if still valid (with 5 minute buffer)
   if (cachedToken && Date.now() < tokenExpiresAt - 300000) {
     return cachedToken.access_token;
   }
 
-  console.log('Fetching new eBay OAuth token...');
-  const credentials = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
-
-  const response = await fetchWithRetry(
-    EBAY_OAUTH_URL,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${credentials}`,
-      },
-      body: `grant_type=client_credentials&scope=${encodeURIComponent(OAUTH_SCOPES)}`,
-    },
-    'eBay OAuth'
-  );
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`eBay OAuth failed: ${response.status} - ${error}`);
+  // If another request is already fetching a token, wait for it
+  if (tokenFetchPromise) {
+    console.log('Waiting for existing token fetch...');
+    return tokenFetchPromise;
   }
 
-  const token: OAuthToken = await response.json();
-  cachedToken = token;
-  tokenExpiresAt = Date.now() + (token.expires_in * 1000);
+  // Create a new token fetch promise (acts as a lock)
+  tokenFetchPromise = (async () => {
+    try {
+      // Double-check cache after acquiring lock (another request may have completed)
+      if (cachedToken && Date.now() < tokenExpiresAt - 300000) {
+        return cachedToken.access_token;
+      }
 
-  return token.access_token;
+      console.log('Fetching new eBay OAuth token...');
+      const credentials = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
+
+      const response = await fetchWithRetry(
+        EBAY_OAUTH_URL,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': `Basic ${credentials}`,
+          },
+          body: `grant_type=client_credentials&scope=${encodeURIComponent(OAUTH_SCOPES)}`,
+          cache: 'no-store', // CRITICAL: Disable Next.js fetch caching
+        } as RequestInit,
+        'eBay OAuth'
+      );
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error('eBay OAuth error:', error);
+        throw new Error(`eBay OAuth failed: ${response.status} - ${error}`);
+      }
+
+      const token: OAuthToken = await response.json();
+      console.log('eBay OAuth token obtained, expires in:', token.expires_in, 'seconds');
+      cachedToken = token;
+      tokenExpiresAt = Date.now() + (token.expires_in * 1000);
+
+      return token.access_token;
+    } finally {
+      // Release the lock
+      tokenFetchPromise = null;
+    }
+  })();
+
+  return tokenFetchPromise;
 }
 
 /**
@@ -265,15 +292,16 @@ export async function searchEbayListings(params: EbaySearchParams): Promise<Ebay
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
-        'Content-Type': 'application/json',
       },
-    },
+      cache: 'no-store', // CRITICAL: Disable Next.js fetch caching
+    } as RequestInit,
     'eBay Search'
   );
 
   if (!response.ok) {
     const error = await response.text();
-    throw new Error(`eBay search failed: ${response.status}`);
+    console.error('eBay search error response:', error);
+    throw new Error(`eBay search failed: ${response.status} - ${error}`);
   }
 
   return response.json();
