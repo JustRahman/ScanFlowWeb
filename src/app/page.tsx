@@ -11,7 +11,7 @@ const HEADERS = {
   'Authorization': `Bearer ${SUPABASE_KEY}`,
 };
 
-type Seller = 'booksrun' | 'oneplanetbooks' | 'thrift.books';
+type Seller = 'booksrun' | 'oneplanetbooks' | 'thrift.books' | 'second.sale';
 type DecisionFilter = 'all' | 'BUY' | 'REVIEW' | 'REJECT';
 type PriceFilter = 'all' | '0-5' | '5-10' | '10-20' | '20+';
 type FormatFilter = 'all' | 'Paperback' | 'Hardcover';
@@ -51,6 +51,7 @@ const SELLERS: { id: Seller; label: string }[] = [
   { id: 'booksrun', label: 'BooksRun' },
   { id: 'oneplanetbooks', label: 'OnePlanetBooks' },
   { id: 'thrift.books', label: 'ThriftBooks' },
+  { id: 'second.sale', label: 'SecondSale' },
 ];
 
 export default function Home() {
@@ -283,8 +284,8 @@ export default function Home() {
     <>
       {/* Header */}
       <div className="header">
-        <h1>{activeSeller === 'booksrun' ? 'BooksRun Deals' : activeSeller === 'oneplanetbooks' ? 'OnePlanetBooks Deals' : 'ThriftBooks Deals'}</h1>
-        <p>{activeSeller === 'booksrun' ? 'Books from BooksRun on eBay' : activeSeller === 'oneplanetbooks' ? 'Books from OnePlanetBooks on eBay' : 'Books from ThriftBooks on eBay'}</p>
+        <h1>{SELLERS.find(s => s.id === activeSeller)?.label ?? activeSeller} Deals</h1>
+        <p>Books from {SELLERS.find(s => s.id === activeSeller)?.label ?? activeSeller} on eBay</p>
 
         <div className="source-toggle-container">
           <div className="source-toggle">
