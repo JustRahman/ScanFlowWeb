@@ -11,7 +11,7 @@ const HEADERS = {
   'Authorization': `Bearer ${SUPABASE_KEY}`,
 };
 
-type Seller = 'booksrun' | 'oneplanetbooks';
+type Seller = 'booksrun' | 'oneplanetbooks' | 'thrift.books';
 type DecisionFilter = 'all' | 'BUY' | 'REVIEW' | 'REJECT';
 type PriceFilter = 'all' | '0-5' | '5-10' | '10-20' | '20+';
 type FormatFilter = 'all' | 'Paperback' | 'Hardcover';
@@ -50,6 +50,7 @@ interface Book {
 const SELLERS: { id: Seller; label: string }[] = [
   { id: 'booksrun', label: 'BooksRun' },
   { id: 'oneplanetbooks', label: 'OnePlanetBooks' },
+  { id: 'thrift.books', label: 'ThriftBooks' },
 ];
 
 export default function Home() {
@@ -70,6 +71,7 @@ export default function Home() {
   // Store all books per seller for counts
   const [allBooksrun, setAllBooksrun] = useState<Book[]>([]);
   const [allOneplanet, setAllOneplanet] = useState<Book[]>([]);
+  const [allThriftbooks, setAllThriftbooks] = useState<Book[]>([]);
 
   // ── Fetch ALL books for a seller with pagination (1000 per page) ──
   const fetchAllBooksForSeller = useCallback(async (seller: string): Promise<Book[]> => {
@@ -100,12 +102,14 @@ export default function Home() {
   useEffect(() => {
     async function loadAll() {
       setLoading(true);
-      const [br, op] = await Promise.all([
+      const [br, op, tb] = await Promise.all([
         fetchAllBooksForSeller('booksrun'),
         fetchAllBooksForSeller('oneplanetbooks'),
+        fetchAllBooksForSeller('thrift.books'),
       ]);
       setAllBooksrun(br);
       setAllOneplanet(op);
+      setAllThriftbooks(tb);
       // Set active seller's books
       setAllBooks(br); // default is booksrun
       setLoading(false);
@@ -115,14 +119,20 @@ export default function Home() {
 
   // ── Switch seller: use cached data ──
   useEffect(() => {
-    setAllBooks(activeSeller === 'booksrun' ? allBooksrun : allOneplanet);
-  }, [activeSeller, allBooksrun, allOneplanet]);
+    const map: Record<Seller, Book[]> = {
+      booksrun: allBooksrun,
+      oneplanetbooks: allOneplanet,
+      'thrift.books': allThriftbooks,
+    };
+    setAllBooks(map[activeSeller]);
+  }, [activeSeller, allBooksrun, allOneplanet, allThriftbooks]);
 
   // ── Seller counts (BUY count for each) ──
   const sellerCounts = useMemo(() => ({
     booksrun: allBooksrun.filter(b => b.decision === 'BUY').length,
     oneplanetbooks: allOneplanet.filter(b => b.decision === 'BUY').length,
-  }), [allBooksrun, allOneplanet]);
+    'thrift.books': allThriftbooks.filter(b => b.decision === 'BUY').length,
+  }), [allBooksrun, allOneplanet, allThriftbooks]);
 
   // ── Stats (computed from all books for active seller) ──
   const stats = useMemo(() => {
@@ -236,8 +246,10 @@ export default function Home() {
       setAllBooks(removeBook);
       if (activeSeller === 'booksrun') {
         setAllBooksrun(removeBook);
-      } else {
+      } else if (activeSeller === 'oneplanetbooks') {
         setAllOneplanet(removeBook);
+      } else {
+        setAllThriftbooks(removeBook);
       }
     } catch (error) {
       console.error('Error updating book:', error);
@@ -271,8 +283,8 @@ export default function Home() {
     <>
       {/* Header */}
       <div className="header">
-        <h1>{activeSeller === 'booksrun' ? 'BooksRun Deals' : 'OnePlanetBooks Deals'}</h1>
-        <p>{activeSeller === 'booksrun' ? 'Books from BooksRun on eBay' : 'Books from OnePlanetBooks on eBay'}</p>
+        <h1>{activeSeller === 'booksrun' ? 'BooksRun Deals' : activeSeller === 'oneplanetbooks' ? 'OnePlanetBooks Deals' : 'ThriftBooks Deals'}</h1>
+        <p>{activeSeller === 'booksrun' ? 'Books from BooksRun on eBay' : activeSeller === 'oneplanetbooks' ? 'Books from OnePlanetBooks on eBay' : 'Books from ThriftBooks on eBay'}</p>
 
         <div className="source-toggle-container">
           <div className="source-toggle">
@@ -555,8 +567,8 @@ export default function Home() {
                           </span>
                         )}
                         <a href={book.ebay_url} target="_blank" rel="noopener noreferrer"
-                          className={`platform-btn ${book.seller === 'booksrun' ? 'ebay' : 'oneplanet'}`}>
-                          <span className="platform-name">{book.seller === 'booksrun' ? 'BR eBay' : 'OnePlanet'}</span>
+                          className={`platform-btn ${book.seller === 'booksrun' ? 'ebay' : book.seller === 'thrift.books' ? 'thriftbooks' : 'oneplanet'}`}>
+                          <span className="platform-name">{book.seller === 'booksrun' ? 'BR eBay' : book.seller === 'thrift.books' ? 'ThriftBooks' : 'OnePlanet'}</span>
                           <span className="platform-price">${buyPrice.toFixed(2)}</span>
                         </a>
                       </div>
