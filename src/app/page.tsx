@@ -73,6 +73,7 @@ export default function Home() {
   const [allBooksrun, setAllBooksrun] = useState<Book[]>([]);
   const [allOneplanet, setAllOneplanet] = useState<Book[]>([]);
   const [allThriftbooks, setAllThriftbooks] = useState<Book[]>([]);
+  const [allSecondsale, setAllSecondsale] = useState<Book[]>([]);
 
   // ── Fetch ALL books for a seller with pagination (1000 per page) ──
   const fetchAllBooksForSeller = useCallback(async (seller: string): Promise<Book[]> => {
@@ -103,14 +104,16 @@ export default function Home() {
   useEffect(() => {
     async function loadAll() {
       setLoading(true);
-      const [br, op, tb] = await Promise.all([
+      const [br, op, tb, ss] = await Promise.all([
         fetchAllBooksForSeller('booksrun'),
         fetchAllBooksForSeller('oneplanetbooks'),
         fetchAllBooksForSeller('thrift.books'),
+        fetchAllBooksForSeller('second.sale'),
       ]);
       setAllBooksrun(br);
       setAllOneplanet(op);
       setAllThriftbooks(tb);
+      setAllSecondsale(ss);
       // Set active seller's books
       setAllBooks(br); // default is booksrun
       setLoading(false);
@@ -124,16 +127,18 @@ export default function Home() {
       booksrun: allBooksrun,
       oneplanetbooks: allOneplanet,
       'thrift.books': allThriftbooks,
+      'second.sale': allSecondsale,
     };
     setAllBooks(map[activeSeller]);
-  }, [activeSeller, allBooksrun, allOneplanet, allThriftbooks]);
+  }, [activeSeller, allBooksrun, allOneplanet, allThriftbooks, allSecondsale]);
 
   // ── Seller counts (BUY count for each) ──
   const sellerCounts = useMemo(() => ({
     booksrun: allBooksrun.filter(b => b.decision === 'BUY').length,
     oneplanetbooks: allOneplanet.filter(b => b.decision === 'BUY').length,
     'thrift.books': allThriftbooks.filter(b => b.decision === 'BUY').length,
-  }), [allBooksrun, allOneplanet, allThriftbooks]);
+    'second.sale': allSecondsale.filter(b => b.decision === 'BUY').length,
+  }), [allBooksrun, allOneplanet, allThriftbooks, allSecondsale]);
 
   // ── Stats (computed from all books for active seller) ──
   const stats = useMemo(() => {
