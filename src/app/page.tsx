@@ -76,6 +76,7 @@ interface Book {
   pounds?: number;
   source_scraped_at?: string;
   _source?: 'ebay' | 'bookfinder' | 'amazon' | 'christianbook' | 'ebay_new' | 'keepa' | 'namesearch' | 'zoombookscompany' | 'medicine';
+  _fastselling?: boolean;
   source_url?: string;
 }
 
@@ -413,7 +414,7 @@ export default function Home() {
       const buy = buyRes.ok ? await buyRes.json() : [];
       const review = reviewRes.ok ? await reviewRes.json() : [];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return [...buy, ...review].map((b: any) => ({ ...b, _source: 'ebay' as const }));
+      return [...buy, ...review].map((b: any) => ({ ...b, _source: 'ebay' as const, _fastselling: true }));
     } catch (error) {
       console.error('Error fetching fastselling:', error);
       return [];
@@ -848,7 +849,7 @@ export default function Home() {
           ...medicineBooks.map(b => `med:${b.id}`),
           ...pangobooks.map(b => `ebay:${b.id}`),
           ...secondSale.map(b => `ebay:${b.id}`),
-          ...fastsellingBooks.map(b => `ebay:${b.id}`),
+          ...fastsellingBooks.map(b => `fs:${b.id}`),
         ];
         const stored = localStorage.getItem('scanflow_seen');
         const seenSet = stored ? new Set<string>(JSON.parse(stored)) : new Set<string>();
@@ -987,6 +988,10 @@ export default function Home() {
       'second.sale': allSecondSale,
       fastselling: allFastselling,
     };
+    // HASAN: fastselling books live inside the BooksRun view, tagged with a FASTSELLING badge
+    if (process.env.NEXT_PUBLIC_TURKISH === 'HASAN' && activeSeller === 'booksrun') {
+      return [...allFastselling, ...allBooksrun];
+    }
     return map[activeSeller];
   }, [activeSeller, allBooksrun, allOneplanet, allThriftbooks, allBwb, allGreenworld, allGreatbook, allBwbWest, allZuber, allBaystate, allAwesome, allGoodwill, allGoodwillBks, allSensational, allBookfinder, allAmazon, allChristianbook, allEbayNew, allKeepa, allNamesearch, allZoombooks, allMedicine, allPangobooks, allSecondSale, allFastselling]);
 
@@ -1112,7 +1117,7 @@ export default function Home() {
   const expensiveBooks = useMemo(() => sortedBooks.filter(b => b.price / 100 >= 20), [sortedBooks]);
 
   // ── Action handler (direct PATCH to Supabase) ──
-  async function handleAction(bookId: number, action: 'BOUGHT' | 'REJECT', buttonElement: HTMLButtonElement) {
+  async function handleAction(bookId: number, action: 'BOUGHT' | 'REJECT', buttonElement: HTMLButtonElement, isFastselling = false) {
     const card = buttonElement.closest('.book-card') as HTMLElement;
     if (!card) return;
 
@@ -1126,7 +1131,7 @@ export default function Home() {
         updateData.bought_at = new Date().toISOString();
       }
 
-      const table = activeSeller === 'keepa' ? KP_TABLE : activeSeller === 'bookfinder' ? BF_TABLE : activeSeller === 'amazon' ? AM_TABLE : activeSeller === 'christianbook' ? CB_TABLE : activeSeller === 'namesearch' ? (process.env.NEXT_PUBLIC_TURKISH === 'HASAN' ? MINI_TABLE : NS_TABLE) : activeSeller === 'medicine' ? MINI_TABLE : activeSeller === 'zoombookscompany' ? ZM_TABLE : TABLE;
+      const table = isFastselling ? FS_TABLE : activeSeller === 'keepa' ? KP_TABLE : activeSeller === 'bookfinder' ? BF_TABLE : activeSeller === 'amazon' ? AM_TABLE : activeSeller === 'christianbook' ? CB_TABLE : activeSeller === 'namesearch' ? (process.env.NEXT_PUBLIC_TURKISH === 'HASAN' ? MINI_TABLE : NS_TABLE) : activeSeller === 'medicine' ? MINI_TABLE : activeSeller === 'zoombookscompany' ? ZM_TABLE : TABLE;
       const keepaBook = activeSeller === 'keepa' ? allKeepa.find(b => b.id === bookId) : null;
       const patchKey = activeSeller === 'keepa' ? `asin=eq.${keepaBook?.isbn}` : `id=eq.${bookId}`;
       const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${patchKey}`, {
@@ -1170,7 +1175,8 @@ export default function Home() {
         'second.sale': setAllSecondSale,
         fastselling: setAllFastselling,
       };
-      setterMap[activeSeller](removeBook);
+      if (isFastselling) setAllFastselling(removeBook);
+      else setterMap[activeSeller](removeBook);
     } catch (error) {
       console.error('Error updating book:', error);
       buttons.forEach(btn => btn.disabled = false);
@@ -1238,11 +1244,11 @@ export default function Home() {
     const soldPerMonth = book.sales_rank_drops_90 != null ? Math.round(book.sales_rank_drops_90 / 3) : null;
     const weightLbs = book.weight_oz ? (book.weight_oz / 16).toFixed(1) : null;
     const bookIsNew = isNewBook(book);
-    const sourcePrefix = book._source === 'bookfinder' ? 'bf' : book._source === 'amazon' ? 'am' : book._source === 'christianbook' ? 'cb' : book._source === 'ebay_new' ? 'en' : book._source === 'keepa' ? 'kp' : book._source === 'namesearch' ? 'ns' : 'ebay';
+    const sourcePrefix = book._fastselling ? 'fs' : book._source === 'bookfinder' ? 'bf' : book._source === 'amazon' ? 'am' : book._source === 'christianbook' ? 'cb' : book._source === 'ebay_new' ? 'en' : book._source === 'keepa' ? 'kp' : book._source === 'namesearch' ? 'ns' : 'ebay';
     const isUnseen = unseenIds.has(`${sourcePrefix}:${book.id}`);
 
     return (
-      <div key={book.id} className={`book-card${isUnseen ? ' unseen' : ''}${process.env.NEXT_PUBLIC_TURKISH === 'ZUBEYR' ? ' zubeyr-large' : ''}`}>
+      <div key={`${sourcePrefix}:${book.id}`} className={`book-card${isUnseen ? ' unseen' : ''}${process.env.NEXT_PUBLIC_TURKISH === 'ZUBEYR' ? ' zubeyr-large' : ''}`}>
         <div className="book-card-content">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
             <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1276,6 +1282,7 @@ export default function Home() {
           </div>
 
           <div className="book-meta">
+            {book._fastselling && <span className="badge badge-fastselling">FASTSELLING</span>}
             {bookIsNew && <span className="badge badge-new">NEW</span>}
             {book._source === 'bookfinder' && <span className="badge badge-source">BF</span>}
             <span className="badge badge-format">{book.book_type || 'Unknown'}</span>
@@ -1411,7 +1418,7 @@ export default function Home() {
           <div className="action-buttons">
             <button
               className="action-btn remove"
-              onClick={(e) => handleAction(book.id, 'REJECT', e.currentTarget)}
+              onClick={(e) => handleAction(book.id, 'REJECT', e.currentTarget, !!book._fastselling)}
               title="Remove"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -1420,7 +1427,7 @@ export default function Home() {
             </button>
             <button
               className="action-btn bought"
-              onClick={(e) => handleAction(book.id, 'BOUGHT', e.currentTarget)}
+              onClick={(e) => handleAction(book.id, 'BOUGHT', e.currentTarget, !!book._fastselling)}
               title="Bought"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -1743,7 +1750,7 @@ export default function Home() {
           <div className="source-toggle-group">
             {process.env.NEXT_PUBLIC_TURKISH !== 'HASAN' && <div className="source-toggle-label">Main Sellers</div>}
             <div className="source-toggle">
-              {SELLERS_MAIN.filter(id => process.env.NEXT_PUBLIC_TURKISH !== 'HASAN' || ['booksrun', 'thrift.books', 'betterworldbooks', 'betterworldbookswest'].includes(id)).map(id => { const s = SELLERS.find(x => x.id === id)!; const hasNew = (statCounts[s.id as ActiveSource]?.today ?? 0) > 0; return (
+              {SELLERS_MAIN.filter(id => process.env.NEXT_PUBLIC_TURKISH !== 'HASAN' || id === 'booksrun').map(id => { const s = SELLERS.find(x => x.id === id)!; const hasNew = (statCounts[s.id as ActiveSource]?.today ?? 0) > 0; return (
                 <button key={s.id} className={`source-btn ${activeSeller === s.id ? 'active' : ''}`} style={hasNew ? { backgroundColor: '#e17055', color: '#fff', borderColor: '#e17055' } : {}} onClick={() => { setActiveSeller(s.id); setHasanFilter(true); }}>
                   {s.label}
                 </button>
@@ -1753,12 +1760,9 @@ export default function Home() {
                   {s.label}
                 </button>
               ); })}
-              <button className={`source-btn ${activeSeller === 'ebay_new' ? 'active' : ''}`} style={(statCounts.ebay_new?.today ?? 0) > 0 ? { backgroundColor: '#e17055', color: '#fff', borderColor: '#e17055' } : {}} onClick={() => { setActiveSeller('ebay_new'); setHasanFilter(false); }}>
-                eBay New
-              </button>
-              {process.env.NEXT_PUBLIC_TURKISH === 'HASAN' && (
-                <button className={`source-btn ${activeSeller === 'fastselling' ? 'active' : ''}`} style={(statCounts.fastselling?.today ?? 0) > 0 ? { backgroundColor: '#e17055', color: '#fff', borderColor: '#e17055' } : {}} onClick={() => { setActiveSeller('fastselling'); setHasanFilter(false); }}>
-                  FastSelling
+              {process.env.NEXT_PUBLIC_TURKISH !== 'HASAN' && (
+                <button className={`source-btn ${activeSeller === 'ebay_new' ? 'active' : ''}`} style={(statCounts.ebay_new?.today ?? 0) > 0 ? { backgroundColor: '#e17055', color: '#fff', borderColor: '#e17055' } : {}} onClick={() => { setActiveSeller('ebay_new'); setHasanFilter(false); }}>
+                  eBay New
                 </button>
               )}
             </div>

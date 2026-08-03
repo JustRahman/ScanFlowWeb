@@ -328,6 +328,14 @@ body {
   font-size: 0.65rem;
 }
 
+.badge-fastselling {
+  background: linear-gradient(135deg, #f39c12 0%, #e17055 100%);
+  color: white;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 .badge-new {
   background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
   color: white;
