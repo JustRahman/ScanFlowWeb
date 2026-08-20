@@ -116,29 +116,7 @@ function numericItemId(id: string): string {
   return id.includes('|') ? id.split('|')[1] : id;
 }
 
-const PASSWORD_CLIENT = process.env.NEXT_PUBLIC_PASSWORD || '131313';
-const PASSWORD_GHOST = '456456';
-
 export default function Home() {
-  const [authed, setAuthed] = useState(() => {
-    if (typeof window !== 'undefined') {
-      // Invalidate old sessions that don't have the version flag
-      if (sessionStorage.getItem('scanflow_auth') === '1' && sessionStorage.getItem('scanflow_v') !== '2') {
-        sessionStorage.removeItem('scanflow_auth');
-        sessionStorage.removeItem('scanflow_ghost');
-        return false;
-      }
-      return sessionStorage.getItem('scanflow_auth') === '1';
-    }
-    return false;
-  });
-  const [isGhost, setIsGhost] = useState(() => {
-    if (typeof window !== 'undefined') return sessionStorage.getItem('scanflow_ghost') === '1';
-    return false;
-  });
-  const [pw, setPw] = useState('');
-  const [pwError, setPwError] = useState(false);
-
   const [loading, setLoading] = useState(true);
   const [activeSeller, setActiveSeller] = useState<ActiveSource>('booksrun');
   const clickedIsbns = useRef<Set<string>>(new Set());
@@ -823,44 +801,41 @@ export default function Home() {
       setAllSecondSale(secondSale);
       setAllFastselling(fastsellingBooks);
 
-      // ── Track unseen books via localStorage (client only, ghost skips) ──
-      const ghostMode = sessionStorage.getItem('scanflow_ghost') === '1';
-      if (!ghostMode) {
-        const allLoaded = [
-          ...booksrun.map(b => `ebay:${b.id}`),
-          ...oneplanet.map(b => `ebay:${b.id}`),
-          ...thriftbooks.map(b => `ebay:${b.id}`),
-          ...bwb.map(b => `ebay:${b.id}`),
-          ...greenworld.map(b => `ebay:${b.id}`),
-          ...greatbook.map(b => `ebay:${b.id}`),
-          ...bwbwest.map(b => `ebay:${b.id}`),
-          ...zuber.map(b => `ebay:${b.id}`),
-          ...baystate.map(b => `ebay:${b.id}`),
-          ...awesome.map(b => `ebay:${b.id}`),
-          ...goodwill.map(b => `ebay:${b.id}`),
-          ...goodwillbks.map(b => `ebay:${b.id}`),
-          ...sensational.map(b => `ebay:${b.id}`),
-          ...bookfinder.map(b => `bf:${b.id}`),
-          ...amazonBooks.map(b => `am:${b.id}`),
-          ...cbBooks.map(b => `cb:${b.id}`),
-          ...ebayNewBooks.map(b => `en:${b.id}`),
-          ...namesearchBooks.map(b => `ns:${b.id}`),
-          ...zoombooksBooks.map(b => `zm:${b.id}`),
-          ...medicineBooks.map(b => `med:${b.id}`),
-          ...pangobooks.map(b => `ebay:${b.id}`),
-          ...secondSale.map(b => `ebay:${b.id}`),
-          ...fastsellingBooks.map(b => `fs:${b.id}`),
-        ];
-        const stored = localStorage.getItem('scanflow_seen');
-        const seenSet = stored ? new Set<string>(JSON.parse(stored)) : new Set<string>();
-        const unseen = new Set<string>();
-        for (const key of allLoaded) {
-          if (!seenSet.has(key)) unseen.add(key);
-        }
-        setUnseenIds(unseen);
-        // Save current IDs as seen for next visit
-        localStorage.setItem('scanflow_seen', JSON.stringify(allLoaded));
+      // ── Track unseen books via localStorage (client only) ──
+      const allLoaded = [
+        ...booksrun.map(b => `ebay:${b.id}`),
+        ...oneplanet.map(b => `ebay:${b.id}`),
+        ...thriftbooks.map(b => `ebay:${b.id}`),
+        ...bwb.map(b => `ebay:${b.id}`),
+        ...greenworld.map(b => `ebay:${b.id}`),
+        ...greatbook.map(b => `ebay:${b.id}`),
+        ...bwbwest.map(b => `ebay:${b.id}`),
+        ...zuber.map(b => `ebay:${b.id}`),
+        ...baystate.map(b => `ebay:${b.id}`),
+        ...awesome.map(b => `ebay:${b.id}`),
+        ...goodwill.map(b => `ebay:${b.id}`),
+        ...goodwillbks.map(b => `ebay:${b.id}`),
+        ...sensational.map(b => `ebay:${b.id}`),
+        ...bookfinder.map(b => `bf:${b.id}`),
+        ...amazonBooks.map(b => `am:${b.id}`),
+        ...cbBooks.map(b => `cb:${b.id}`),
+        ...ebayNewBooks.map(b => `en:${b.id}`),
+        ...namesearchBooks.map(b => `ns:${b.id}`),
+        ...zoombooksBooks.map(b => `zm:${b.id}`),
+        ...medicineBooks.map(b => `med:${b.id}`),
+        ...pangobooks.map(b => `ebay:${b.id}`),
+        ...secondSale.map(b => `ebay:${b.id}`),
+        ...fastsellingBooks.map(b => `fs:${b.id}`),
+      ];
+      const stored = localStorage.getItem('scanflow_seen');
+      const seenSet = stored ? new Set<string>(JSON.parse(stored)) : new Set<string>();
+      const unseen = new Set<string>();
+      for (const key of allLoaded) {
+        if (!seenSet.has(key)) unseen.add(key);
       }
+      setUnseenIds(unseen);
+      // Save current IDs as seen for next visit
+      localStorage.setItem('scanflow_seen', JSON.stringify(allLoaded));
 
       // ── Fetch Zubeyr bought count ──
       if (process.env.NEXT_PUBLIC_TURKISH === 'ZUBEYR') {
@@ -1440,61 +1415,7 @@ export default function Home() {
     );
   };
 
-  if (!authed) {
-    return (
-      <div style={{
-        minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      }}>
-        <div style={{
-          background: '#fff', borderRadius: '1rem', padding: '2.5rem 2rem',
-          width: '360px', textAlign: 'center', boxShadow: '0 24px 48px rgba(0,0,0,0.2)',
-        }}>
-          <h1 style={{ fontSize: '1.75rem', color: '#333', marginBottom: '0.5rem' }}>ScanFlow</h1>
-          <p style={{ color: '#888', fontSize: '0.9rem', marginBottom: '1.5rem' }}>Enter password to continue</p>
-          <form onSubmit={e => {
-            e.preventDefault();
-            if (pw === PASSWORD_CLIENT || pw === PASSWORD_GHOST) {
-              sessionStorage.setItem('scanflow_auth', '1');
-              sessionStorage.setItem('scanflow_v', '2');
-              if (pw === PASSWORD_GHOST) {
-                sessionStorage.setItem('scanflow_ghost', '1');
-                setIsGhost(true);
-              } else {
-                sessionStorage.removeItem('scanflow_ghost');
-                setIsGhost(false);
-              }
-              setAuthed(true);
-            } else {
-              setPwError(true);
-              setPw('');
-            }
-          }}>
-            <input
-              type="password"
-              value={pw}
-              onChange={e => { setPw(e.target.value); setPwError(false); }}
-              placeholder="Password"
-              autoFocus
-              style={{
-                width: '100%', padding: '0.75rem 1rem', borderRadius: '0.5rem',
-                border: `1px solid ${pwError ? '#e74c3c' : '#ddd'}`, fontSize: '1rem',
-                outline: 'none', marginBottom: '0.75rem', boxSizing: 'border-box',
-              }}
-            />
-            {pwError && <p style={{ color: '#e74c3c', fontSize: '0.85rem', marginBottom: '0.75rem' }}>Wrong password</p>}
-            <button type="submit" style={{
-              width: '100%', padding: '0.75rem', borderRadius: '0.5rem', border: 'none',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              color: '#fff', fontSize: '1rem', fontWeight: 600, cursor: 'pointer',
-            }}>Sign In</button>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Admin Panel (HASAN + ghost only) ──
+  // ── Admin Panel (HASAN only) ──
   if (adminMode && process.env.NEXT_PUBLIC_TURKISH === 'HASAN') {
     const filtered = adminBooks.filter(b => {
       if (adminDecisionFilter !== 'all' && b.decision !== adminDecisionFilter) return false;
