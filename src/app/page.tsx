@@ -26,6 +26,15 @@ const HEADERS = {
 type Seller = 'booksrun' | 'oneplanetbooks' | 'thrift.books' | 'betterworldbooks' | 'greenworldbooks' | 'greatbookprices1' | 'betterworldbookswest' | 'zuber' | 'baystatebooks' | 'Awesomebooksusa' | 'goodwillswpa' | 'goodwillbks' | 'sensational-buys' | 'zoombookscompany' | 'pangobooks' | 'second.sale';
 type ActiveSource = Seller | 'bookfinder' | 'amazon' | 'christianbook' | 'ebay_new' | 'keepa' | 'namesearch' | 'medicine' | 'fastselling';
 type DecisionFilter = 'all' | 'BUY' | 'REVIEW' | 'REJECT';
+
+// Display-only labels. The underlying decision values (BUY/REVIEW/REJECT)
+// are unchanged — this only affects what the reader sees.
+const DECISION_LABELS: Record<string, string> = {
+  BUY: 'Best Value',
+  REVIEW: 'Worth a Look',
+  REJECT: 'Skip',
+};
+const decisionLabel = (d: string) => DECISION_LABELS[d] ?? d;
 type PriceFilter = 'all' | '0-5' | '5-10' | '10-20' | '20+';
 type FormatFilter = 'all' | 'Paperback' | 'Hardcover';
 type WeightFilter = 'all' | '0-5' | '5-10' | '10-20' | '20+';
@@ -1228,7 +1237,7 @@ export default function Home() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
             <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap' }}>
               {book.decision ? (
-                <span className={`decision-badge ${book.decision}`}>{book.decision}</span>
+                <span className={`decision-badge ${book.decision}`}>{decisionLabel(book.decision)}</span>
               ) : null}
               {book.new_decision && process.env.NEXT_PUBLIC_TURKISH !== 'ZUBEYR' && (
                 <span
@@ -1241,7 +1250,7 @@ export default function Home() {
                   }}
                   title={`Shadow decision (seasonal pricing, source: ${book.price_source || 'annual'})${shadowDiverges ? ' — DIVERGES' : ' — matches'}`}
                 >
-                  NEW: {book.new_decision}
+                  NEW: {decisionLabel(book.new_decision)}
                 </span>
               )}
             </div>
@@ -1636,13 +1645,17 @@ export default function Home() {
             </div>
           </div>
         )}
-        <h1>{activeSeller === 'bookfinder' ? 'BooksFinder' : activeSeller === 'amazon' ? 'Amazon' : activeSeller === 'christianbook' ? 'ChristianBook' : activeSeller === 'ebay_new' ? 'eBay New' : activeSeller === 'keepa' ? 'Keepa' : activeSeller === 'namesearch' ? 'NameSearch' : activeSeller === 'medicine' ? 'Medicine' : (SELLERS.find(s => s.id === activeSeller)?.label ?? activeSeller)} Deals</h1>
+        <h1>Book Price Comparison</h1>
         {process.env.NEXT_PUBLIC_TURKISH === 'ZUBEYR' && (
           <p style={{ fontSize: '1.3rem', fontWeight: 700, color: '#fdcb6e', margin: '0.2rem 0 0.5rem', letterSpacing: '0.02em' }}>
             📅 Books update: 7:30 am and 7:30 pm
           </p>
         )}
-        <p>{activeSeller === 'bookfinder' ? 'Books from BooksFinder' : activeSeller === 'amazon' ? 'Books from Amazon' : activeSeller === 'christianbook' ? 'Books from ChristianBook.com' : activeSeller === 'ebay_new' ? 'New books from eBay' : activeSeller === 'keepa' ? 'Top BUY books from Keepa' : activeSeller === 'namesearch' ? 'Books from NameSearch' : activeSeller === 'medicine' ? 'Medicine books' : `Books from ${SELLERS.find(s => s.id === activeSeller)?.label ?? activeSeller} on eBay`}</p>
+        <p>Comparing used book prices across BooksRun, eBay and Amazon</p>
+        <p style={{ maxWidth: '640px', margin: '0.5rem auto 0', fontSize: '0.85rem', opacity: 0.85, lineHeight: 1.5 }}>
+          ScanFlow compares used book prices and buyback offers across multiple vendors by ISBN,
+          so you can find the best place to buy or sell a title.
+        </p>
 
         {process.env.NEXT_PUBLIC_TURKISH === 'ZUBEYR' ? (
           <div className="source-toggle-container">
@@ -1717,15 +1730,15 @@ export default function Home() {
           </div>
           <div className="stat">
             <div className="stat-value" style={{ color: '#00cec9' }}>{stats.buy}</div>
-            <div className="stat-label">BUY</div>
+            <div className="stat-label">{decisionLabel('BUY')}</div>
           </div>
           <div className="stat">
             <div className="stat-value" style={{ color: '#fdcb6e' }}>{stats.review}</div>
-            <div className="stat-label">REVIEW</div>
+            <div className="stat-label">{decisionLabel('REVIEW')}</div>
           </div>
           <div className="stat">
             <div className="stat-value" style={{ color: '#e74c3c' }}>{stats.reject}</div>
-            <div className="stat-label">REJECT</div>
+            <div className="stat-label">{decisionLabel('REJECT')}</div>
           </div>
         </div>
 
@@ -1837,7 +1850,7 @@ export default function Home() {
 
           {process.env.NEXT_PUBLIC_TURKISH !== 'ZUBEYR' && (
           <div className="filter-section">
-            <div className="filter-title">Hasan Filter</div>
+            <div className="filter-title">Quick Filter</div>
             <div className="filter-options">
               <div
                 className={`filter-toggle ${hasanFilter ? 'active' : ''}`}
@@ -1860,7 +1873,7 @@ export default function Home() {
                   onClick={() => setDecisionFilter(d)}
                 >
                   <span className="checkbox" />
-                  <span className="label">{d === 'all' ? 'All' : d}</span>
+                  <span className="label">{d === 'all' ? 'All' : decisionLabel(d)}</span>
                 </div>
               ))}
             </div>
@@ -2023,6 +2036,10 @@ export default function Home() {
           )}
         </div>
       </div>
+
+      <footer style={{ textAlign: 'center', padding: '1.5rem 1rem 2.5rem', color: '#888', fontSize: '0.8rem' }}>
+        Comparing prices from BooksRun, eBay and Amazon. More vendors coming soon.
+      </footer>
 
       {priceHistoryAsin && (() => {
         const W = 780, H = 320, PAD = 50;
